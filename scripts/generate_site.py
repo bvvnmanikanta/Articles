@@ -23,17 +23,15 @@ for article in articles:
     <article>
       <h2>{title}</h2>
 
-      <p>
-        <a href="articles/{article.stem}.html">
-          Read Online
-        </a>
-      </p>
-
-      <p>
-        <a href="../pdfs/{article.stem}.pdf">
-          Download PDF
-        </a>
-      </p>
+      <div class="button-container">
+          <a class="btn" href="articles/{article.stem}.html">
+            Read Online
+          </a>
+        
+          <a class="btn" href="../pdfs/{article.stem}.pdf">
+            Download PDF
+          </a>
+      </div>
 
       <hr>
     </article>
