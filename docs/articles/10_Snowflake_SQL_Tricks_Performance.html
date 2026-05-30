@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <link rel="stylesheet" href="../assets/medium.css">
+</head>
+<body>
+
+<main>
+<h1
+id="snowflake-sql-tricks-that-instantly-improve-query-performance">10
+Snowflake SQL Tricks That Instantly Improve Query Performance</h1>
+<p>If your Snowflake queries are becoming slower as data grows, you are
+not alone.</p>
+<p>Many developers focus only on warehouse size when optimizing
+performance. But in reality, small SQL improvements can reduce execution
+time dramatically while also lowering compute costs.</p>
+<p>In this article, we’ll explore 10 practical Snowflake SQL tricks that
+instantly improve query performance — with examples you can start using
+today.</p>
+<hr />
+<h1 id="select-only-required-columns">1. Select Only Required
+Columns</h1>
+<p>One of the most common performance mistakes is using:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> SALES_DATA;</span></code></pre></div>
+<p>This forces Snowflake to scan unnecessary columns.</p>
+<p>Instead:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> CUSTOMER_ID, ORDER_DATE, TOTAL_AMOUNT</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> SALES_DATA;</span></code></pre></div>
+<h2 id="why-it-helps">Why It Helps</h2>
+<p>Snowflake uses columnar storage.</p>
+<p>Reading fewer columns means:</p>
+<ul>
+<li>Less data scanned</li>
+<li>Faster execution</li>
+<li>Lower cost</li>
+</ul>
+<p>This becomes extremely important for wide tables containing hundreds
+of columns.</p>
+<hr />
+<h1 id="filter-early-using-where-clause">2. Filter Early Using WHERE
+Clause</h1>
+<p>Bad approach:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>QUALIFY <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">PARTITION</span> <span class="kw">BY</span> CUSTOMER_ID</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> ORDER_DATE <span class="kw">DESC</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>) <span class="op">=</span> <span class="dv">1</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">AND</span> ORDER_DATE <span class="op">&gt;=</span> <span class="st">&#39;2025-01-01&#39;</span>;</span></code></pre></div>
+<p>Better approach:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> ORDER_DATE <span class="op">&gt;=</span> <span class="st">&#39;2025-01-01&#39;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>QUALIFY <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">PARTITION</span> <span class="kw">BY</span> CUSTOMER_ID</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> ORDER_DATE <span class="kw">DESC</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>) <span class="op">=</span> <span class="dv">1</span>;</span></code></pre></div>
+<h2 id="why-it-helps-1">Why It Helps</h2>
+<p>Filtering earlier reduces:</p>
+<ul>
+<li>Rows processed</li>
+<li>Memory usage</li>
+<li>Window function workload</li>
+</ul>
+<p>Always reduce dataset size before expensive operations.</p>
+<hr />
+<h1 id="avoid-using-functions-on-filter-columns">3. Avoid Using
+Functions on Filter Columns</h1>
+<p>Slow query:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> CUSTOMERS</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> <span class="dt">YEAR</span>(CREATED_AT) <span class="op">=</span> <span class="dv">2025</span>;</span></code></pre></div>
+<p>Optimized query:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> CUSTOMERS</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> CREATED_AT <span class="op">&gt;=</span> <span class="st">&#39;2025-01-01&#39;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">AND</span> CREATED_AT <span class="op">&lt;</span> <span class="st">&#39;2026-01-01&#39;</span>;</span></code></pre></div>
+<h2 id="why-it-helps-2">Why It Helps</h2>
+<p>Functions on columns prevent:</p>
+<ul>
+<li>Micro-partition pruning</li>
+<li>Efficient scanning</li>
+</ul>
+<p>Snowflake performs best when predicates directly reference raw column
+values.</p>
+<hr />
+<h1 id="use-qualify-instead-of-nested-subqueries">4. Use QUALIFY Instead
+of Nested Subqueries</h1>
+<p>Traditional approach:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> (</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span> <span class="op">*</span>,</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>               <span class="kw">PARTITION</span> <span class="kw">BY</span> CUSTOMER_ID</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>               <span class="kw">ORDER</span> <span class="kw">BY</span> ORDER_DATE <span class="kw">DESC</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>           ) <span class="kw">AS</span> RN</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> ORDERS</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> RN <span class="op">=</span> <span class="dv">1</span>;</span></code></pre></div>
+<p>Better Snowflake-native approach:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>QUALIFY <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">PARTITION</span> <span class="kw">BY</span> CUSTOMER_ID</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> ORDER_DATE <span class="kw">DESC</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>) <span class="op">=</span> <span class="dv">1</span>;</span></code></pre></div>
+<h2 id="why-it-helps-3">Why It Helps</h2>
+<p><code>QUALIFY</code>:</p>
+<ul>
+<li>Simplifies query structure</li>
+<li>Improves readability</li>
+<li>Often reduces unnecessary intermediate processing</li>
+</ul>
+<p>It’s one of Snowflake’s most useful SQL features.</p>
+<hr />
+<h1 id="use-approx-functions-for-large-analytics">5. Use APPROX
+Functions for Large Analytics</h1>
+<p>Exact distinct counts are expensive:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> USER_ID)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> EVENT_LOGS;</span></code></pre></div>
+<p>Faster alternative:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> APPROX_COUNT_DISTINCT(USER_ID)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> EVENT_LOGS;</span></code></pre></div>
+<h2 id="why-it-helps-4">Why It Helps</h2>
+<p>Approximation algorithms:</p>
+<ul>
+<li>Consume less memory</li>
+<li>Execute faster</li>
+<li>Scale better on huge datasets</li>
+</ul>
+<p>Perfect for dashboards and analytics where tiny inaccuracies are
+acceptable.</p>
+<hr />
+<h1 id="reduce-data-before-joins">6. Reduce Data Before JOINs</h1>
+<p>Inefficient approach:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS O</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="kw">JOIN</span> CUSTOMERS C</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="kw">ON</span> O.CUSTOMER_ID <span class="op">=</span> C.CUSTOMER_ID</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> O.ORDER_DATE <span class="op">&gt;=</span> <span class="st">&#39;2025-01-01&#39;</span>;</span></code></pre></div>
+<p>Better approach:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> FILTERED_ORDERS <span class="kw">AS</span> (</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> ORDERS</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">WHERE</span> ORDER_DATE <span class="op">&gt;=</span> <span class="st">&#39;2025-01-01&#39;</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> FILTERED_ORDERS O</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="kw">JOIN</span> CUSTOMERS C</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="kw">ON</span> O.CUSTOMER_ID <span class="op">=</span> C.CUSTOMER_ID;</span></code></pre></div>
+<h2 id="why-it-helps-5">Why It Helps</h2>
+<p>Smaller joins mean:</p>
+<ul>
+<li>Less shuffling</li>
+<li>Lower memory usage</li>
+<li>Faster execution</li>
+</ul>
+<p>Always reduce rows before joins whenever possible.</p>
+<hr />
+<h1 id="prefer-union-all-over-union">7. Prefer UNION ALL Over UNION</h1>
+<p>Expensive query:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> JAN_SALES</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">UNION</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> FEB_SALES;</span></code></pre></div>
+<p>Optimized query:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> JAN_SALES</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">UNION</span> <span class="kw">ALL</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span> <span class="kw">FROM</span> FEB_SALES;</span></code></pre></div>
+<h2 id="why-it-helps-6">Why It Helps</h2>
+<p><code>UNION</code> performs duplicate elimination, which
+requires:</p>
+<ul>
+<li>Sorting</li>
+<li>Additional memory</li>
+<li>More compute</li>
+</ul>
+<p>If duplicates are acceptable, always use <code>UNION ALL</code>.</p>
+<hr />
+<h1 id="cluster-large-tables-strategically">8. Cluster Large Tables
+Strategically</h1>
+<p>For very large tables, clustering can dramatically improve
+pruning.</p>
+<p>Example:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> SALES</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CLUSTER</span> <span class="kw">BY</span> (ORDER_DATE);</span></code></pre></div>
+<h2 id="why-it-helps-7">Why It Helps</h2>
+<p>Clustering improves:</p>
+<ul>
+<li>Micro-partition pruning</li>
+<li>Query scan efficiency</li>
+<li>Performance on filtered queries</li>
+</ul>
+<p>Best for tables:</p>
+<ul>
+<li>With billions of rows</li>
+<li>Frequently filtered on the same columns</li>
+</ul>
+<p>Avoid excessive clustering on small tables.</p>
+<hr />
+<h1 id="use-result-cache-whenever-possible">9. Use RESULT CACHE Whenever
+Possible</h1>
+<p>Snowflake automatically caches query results.</p>
+<p>Running the exact same query again:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> DAILY_METRICS</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> METRIC_DATE <span class="op">=</span> <span class="fu">CURRENT_DATE</span>;</span></code></pre></div>
+<p>may return instantly from cache.</p>
+<h2 id="tips-to-maximize-cache-usage">Tips to Maximize Cache Usage</h2>
+<ul>
+<li>Avoid unnecessary query changes</li>
+<li>Use consistent formatting</li>
+<li>Reuse stable SQL patterns</li>
+</ul>
+<p>Cached results can return in milliseconds without consuming
+compute.</p>
+<hr />
+<h1 id="analyze-query-profile-regularly">10. Analyze Query Profile
+Regularly</h1>
+<p>The Query Profile is one of the most powerful optimization tools in
+Snowflake.</p>
+<p>It helps identify:</p>
+<ul>
+<li>Expensive joins</li>
+<li>Large scans</li>
+<li>Data skew</li>
+<li>Spilling to disk</li>
+<li>Bottlenecks</li>
+</ul>
+<h2 id="what-to-watch">What to Watch</h2>
+<p>Focus on:</p>
+<ul>
+<li>Partitions scanned</li>
+<li>Bytes spilled</li>
+<li>Join explosion</li>
+<li>Long-running operators</li>
+</ul>
+<p>Even a well-written query can hide expensive execution steps.</p>
+<hr />
+<h1 id="bonus-tips">Bonus Tips</h1>
+<h2 id="use-search-optimization-service-carefully">Use Search
+Optimization Service Carefully</h2>
+<p>Useful for highly selective lookups:</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> CUSTOMERS</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="kw">ADD</span> SEARCH OPTIMIZATION;</span></code></pre></div>
+<p>Best for:</p>
+<ul>
+<li>Point lookups</li>
+<li>Text searches</li>
+<li>Highly selective filters</li>
+</ul>
+<p>But avoid enabling it everywhere because it increases storage
+costs.</p>
+<hr />
+<h1 id="common-performance-mistakes">Common Performance Mistakes</h1>
+<table>
+<thead>
+<tr class="header">
+<th>Mistake</th>
+<th>Better Approach</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>SELECT *</code></td>
+<td>Select required columns</td>
+</tr>
+<tr class="even">
+<td><code>UNION</code> everywhere</td>
+<td>Use <code>UNION ALL</code></td>
+</tr>
+<tr class="odd">
+<td>Functions in WHERE clause</td>
+<td>Use direct predicates</td>
+</tr>
+<tr class="even">
+<td>Large joins without filtering</td>
+<td>Filter first</td>
+</tr>
+<tr class="odd">
+<td>Exact analytics on huge data</td>
+<td>Use APPROX functions</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="final-thoughts">Final Thoughts</h1>
+<p>Snowflake performance optimization is often about reducing
+unnecessary work.</p>
+<p>The biggest improvements usually come from:</p>
+<ul>
+<li>Scanning less data</li>
+<li>Filtering earlier</li>
+<li>Simplifying execution plans</li>
+<li>Using Snowflake-native features properly</li>
+</ul>
+<p>You do not always need larger warehouses.</p>
+<p>Sometimes a simple SQL rewrite can make queries run 10x faster while
+significantly reducing cost.</p>
+<hr />
+<h1 id="which-optimization-gives-the-biggest-impact">Which Optimization
+Gives the Biggest Impact?</h1>
+<p>In real-world Snowflake workloads, these usually provide the biggest
+gains:</p>
+<ol type="1">
+<li>Eliminating <code>SELECT *</code></li>
+<li>Better filtering for partition pruning</li>
+<li>Reducing JOIN size</li>
+<li>Using clustering strategically</li>
+<li>Leveraging caching effectively</li>
+</ol>
+<p>Start with these first before scaling warehouse size.</p>
+</main>
+
+</body>
+</html>

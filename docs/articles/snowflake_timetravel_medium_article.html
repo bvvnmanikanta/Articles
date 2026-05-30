@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <link rel="stylesheet" href="../assets/medium.css">
+</head>
+<body>
+
+<main>
+<h1
+id="mastering-time-travel-in-snowflake-query-the-past-like-a-pro">Mastering
+Time Travel in Snowflake: Query the Past Like a Pro</h1>
+<p>Data mistakes happen.</p>
+<p>Someone accidentally deletes records.<br />
+A bad deployment overwrites data.<br />
+An ETL job corrupts a table at 2 AM.</p>
+<p>In traditional databases, recovery can be painful and sometimes
+impossible.</p>
+<p>But in Snowflake, there’s a superpower called <strong>Time
+Travel</strong> that allows you to access historical data from the past
+— almost like having a built-in undo button for your database.</p>
+<p>In this article, we’ll explore:</p>
+<ul>
+<li>What Time Travel is</li>
+<li>What you can and cannot do with it</li>
+<li>How it works internally</li>
+<li>Retention periods</li>
+<li>Querying historical data</li>
+<li>Restoring deleted tables</li>
+<li>Real-world examples</li>
+<li>Best practices</li>
+</ul>
+<hr />
+<h1 id="what-is-time-travel">What is Time Travel?</h1>
+<p>Time Travel in Snowflake allows you to:</p>
+<ul>
+<li>Access historical versions of data</li>
+<li>Query data from the past</li>
+<li>Recover deleted objects</li>
+<li>Restore accidentally modified data</li>
+</ul>
+<p>It works for:</p>
+<ul>
+<li>Tables</li>
+<li>Schemas</li>
+<li>Databases</li>
+</ul>
+<p>Snowflake stores previous versions of data for a configurable
+retention period.</p>
+<hr />
+<h1 id="what-you-can-do-with-time-travel">What You CAN Do with Time
+Travel</h1>
+<p>Time Travel is extremely powerful for recovery, auditing, and
+debugging.</p>
+<h2 id="query-historical-data">1. Query Historical Data</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> employees</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AT</span> (OFFSET <span class="op">=&gt;</span> <span class="op">-</span><span class="dv">3600</span>);</span></code></pre></div>
+<p>This queries the table from 1 hour ago.</p>
+<hr />
+<h2 id="recover-deleted-tables">2. Recover Deleted Tables</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">DROP</span> <span class="kw">TABLE</span> employees;</span></code></pre></div>
+<p>Recover it instantly:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>UNDROP <span class="kw">TABLE</span> employees;</span></code></pre></div>
+<hr />
+<h2 id="recover-deleted-schemas-and-databases">3. Recover Deleted
+Schemas and Databases</h2>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>UNDROP <span class="kw">SCHEMA</span> sales_schema;</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>UNDROP <span class="kw">DATABASE</span> sales_db;</span></code></pre></div>
+<hr />
+<h2 id="compare-old-vs-current-data">4. Compare Old vs Current Data</h2>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    curr.<span class="kw">id</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    curr.salary <span class="kw">AS</span> current_salary,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">old</span>.salary <span class="kw">AS</span> old_salary</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> employees curr</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="kw">JOIN</span> employees <span class="kw">AT</span> (OFFSET <span class="op">=&gt;</span> <span class="op">-</span><span class="dv">3600</span>) <span class="kw">old</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="kw">ON</span> curr.<span class="kw">id</span> <span class="op">=</span> <span class="kw">old</span>.<span class="kw">id</span>;</span></code></pre></div>
+<hr />
+<h2 id="clone-historical-data">5. Clone Historical Data</h2>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> employees_backup</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CLONE</span> employees</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AT</span> (OFFSET <span class="op">=&gt;</span> <span class="op">-</span><span class="dv">7200</span>);</span></code></pre></div>
+<hr />
+<h2 id="recover-accidentally-deleted-rows">6. Recover Accidentally
+Deleted Rows</h2>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">DELETE</span> <span class="kw">FROM</span> orders <span class="kw">WHERE</span> status <span class="op">=</span> <span class="st">&#39;ACTIVE&#39;</span>;</span></code></pre></div>
+<p>Restore using historical snapshot:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> orders</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> orders</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">AT</span> (OFFSET <span class="op">=&gt;</span> <span class="op">-</span><span class="dv">300</span>)</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> status <span class="op">=</span> <span class="st">&#39;ACTIVE&#39;</span>;</span></code></pre></div>
+<hr />
+<h2 id="audit-historical-state">7. Audit Historical State</h2>
+<p>Useful for:</p>
+<ul>
+<li>Auditing</li>
+<li>Compliance</li>
+<li>Root cause analysis</li>
+<li>Financial reporting</li>
+</ul>
+<hr />
+<h2 id="recover-from-bad-updates-or-merges">8. Recover from Bad Updates
+or Merges</h2>
+<p>Retrieve previous versions after bad updates or merges.</p>
+<hr />
+<h1 id="what-you-cannot-do-with-time-travel">What You CANNOT Do with
+Time Travel</h1>
+<h2 id="you-cannot-recover-data-after-retention-expires">1. You Cannot
+Recover Data After Retention Expires</h2>
+<p>Once retention ends, historical data is permanently unavailable.</p>
+<hr />
+<h2 id="you-cannot-time-travel-forever">2. You Cannot Time Travel
+Forever</h2>
+<p>Maximum retention:</p>
+<ul>
+<li>Standard Edition → 1 day</li>
+<li>Enterprise Edition → up to 90 days</li>
+</ul>
+<hr />
+<h2 id="you-cannot-recover-data-after-fail-safe-ends">3. You Cannot
+Recover Data After Fail-safe Ends</h2>
+<p>Fail-safe is not directly accessible to users.</p>
+<hr />
+<h2
+id="you-cannot-use-time-travel-on-external-tables-like-regular-tables">4.
+You Cannot Use Time Travel on External Tables Like Regular Tables</h2>
+<p>External tables have limited support.</p>
+<hr />
+<h2 id="you-cannot-restore-individual-columns">5. You Cannot Restore
+Individual Columns</h2>
+<p>Time Travel restores object/data versions, not individual
+columns.</p>
+<hr />
+<h2 id="you-cannot-use-time-travel-if-the-object-did-not-exist">6. You
+Cannot Use Time Travel if the Object Did Not Exist</h2>
+<p>Historical queries fail if the object didn’t exist at that time.</p>
+<hr />
+<h2 id="you-cannot-recover-temporary-tables-after-session-ends">7. You
+Cannot Recover Temporary Tables After Session Ends</h2>
+<p>Temporary tables disappear after session termination.</p>
+<hr />
+<h2 id="you-cannot-avoid-storage-costs">8. You Cannot Avoid Storage
+Costs</h2>
+<p>Historical versions consume storage.</p>
+<hr />
+<h2
+id="you-cannot-recover-privileges-automatically-in-every-scenario">9.
+You Cannot Recover Privileges Automatically in Every Scenario</h2>
+<p>Always verify grants after recovery.</p>
+<hr />
+<h2 id="you-cannot-use-time-travel-as-a-backup-replacement">10. You
+Cannot Use Time Travel as a Backup Replacement</h2>
+<p>It complements backups — it does not replace them.</p>
+<hr />
+<h1 id="time-travel-retention-period">Time Travel Retention Period</h1>
+<table>
+<thead>
+<tr class="header">
+<th>Edition</th>
+<th>Retention Period</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Standard</td>
+<td>1 day</td>
+</tr>
+<tr class="even">
+<td>Enterprise</td>
+<td>Up to 90 days</td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">ALTER</span> <span class="kw">TABLE</span> employees</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SET</span> DATA_RETENTION_TIME_IN_DAYS <span class="op">=</span> <span class="dv">7</span>;</span></code></pre></div>
+<hr />
+<h1 id="creating-sample-data">Creating Sample Data</h1>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">OR</span> <span class="kw">REPLACE</span> <span class="kw">TABLE</span> employees (</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">id</span> <span class="dt">INT</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    name STRING,</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    salary <span class="dt">NUMBER</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>);</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="kw">INSERT</span> <span class="kw">INTO</span> employees <span class="kw">VALUES</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>(<span class="dv">1</span>, <span class="st">&#39;Alice&#39;</span>, <span class="dv">50000</span>),</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>(<span class="dv">2</span>, <span class="st">&#39;Bob&#39;</span>, <span class="dv">60000</span>),</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>(<span class="dv">3</span>, <span class="st">&#39;Charlie&#39;</span>, <span class="dv">70000</span>);</span></code></pre></div>
+<hr />
+<h1 id="query-historical-data-using-at">Query Historical Data Using
+AT</h1>
+<h2 id="using-offset">Using OFFSET</h2>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> employees</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AT</span> (OFFSET <span class="op">=&gt;</span> <span class="op">-</span><span class="dv">3600</span>);</span></code></pre></div>
+<hr />
+<h2 id="using-timestamp">Using TIMESTAMP</h2>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> employees</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="kw">AT</span> (</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">TIMESTAMP</span> <span class="op">=&gt;</span> <span class="st">&#39;2026-05-11 10:00:00&#39;</span>:<span class="ch">:TIMESTAMP</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>);</span></code></pre></div>
+<hr />
+<h2 id="using-statement">Using STATEMENT</h2>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">TABLE</span>(INFORMATION_SCHEMA.QUERY_HISTORY())</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> START_TIME <span class="kw">DESC</span>;</span></code></pre></div>
+<p>Then:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> employees</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="kw">BEFORE</span>(STATEMENT <span class="op">=&gt;</span> <span class="st">&#39;01b12345-0001-aaaa-0000-123456789abc&#39;</span>);</span></code></pre></div>
+<hr />
+<h1
+id="understanding-how-snowflake-stores-historical-data">Understanding
+How Snowflake Stores Historical Data</h1>
+<p>Snowflake uses:</p>
+<ul>
+<li>Immutable micro-partitions</li>
+<li>Metadata tracking</li>
+<li>Copy-on-write architecture</li>
+</ul>
+<p>Instead of physically rewriting files, Snowflake maintains references
+to historical versions.</p>
+<hr />
+<h1 id="time-travel-vs-fail-safe">Time Travel vs Fail-safe</h1>
+<table>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Time Travel</th>
+<th>Fail-safe</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>User Accessible</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td>Query Historical Data</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td>Recover Dropped Objects</td>
+<td>Yes</td>
+<td>Limited</td>
+</tr>
+<tr class="even">
+<td>Used For</td>
+<td>Operational recovery</td>
+<td>Disaster recovery</td>
+</tr>
+<tr class="odd">
+<td>Retention</td>
+<td>Up to 90 days</td>
+<td>Additional 7 days</td>
+</tr>
+<tr class="even">
+<td>Recoverable By</td>
+<td>User</td>
+<td>Snowflake Support</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="best-practices">Best Practices</h1>
+<h2 id="keep-retention-based-on-business-needs">Keep Retention Based on
+Business Needs</h2>
+<p>Longer retention = higher storage costs.</p>
+<hr />
+<h2 id="use-cloning-before-risky-operations">Use Cloning Before Risky
+Operations</h2>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> employees_clone <span class="kw">CLONE</span> employees;</span></code></pre></div>
+<hr />
+<h2 id="monitor-storage-usage">Monitor Storage Usage</h2>
+<p>Historical data contributes to storage billing.</p>
+<hr />
+<h2 id="use-statement-based-recovery">Use Statement-Based Recovery</h2>
+<p>Combining query history with Time Travel is very powerful.</p>
+<hr />
+<h1 id="final-thoughts">Final Thoughts</h1>
+<p>Time Travel is one of Snowflake’s most valuable features.</p>
+<p>It gives your data warehouse memory.</p>
+<p>With it, you can:</p>
+<ul>
+<li>Recover deleted data</li>
+<li>Debug production issues</li>
+<li>Audit historical states</li>
+<li>Restore corrupted datasets</li>
+<li>Safely experiment with transformations</li>
+</ul>
+<p>But understanding its limitations is equally important.</p>
+<hr />
+<h1 id="quick-cheat-sheet">Quick Cheat Sheet</h1>
+<table>
+<thead>
+<tr class="header">
+<th>Task</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Query old data</td>
+<td><code>AT (OFFSET =&gt; -3600)</code></td>
+</tr>
+<tr class="even">
+<td>Query exact time</td>
+<td><code>AT (TIMESTAMP =&gt; ...)</code></td>
+</tr>
+<tr class="odd">
+<td>Query before statement</td>
+<td><code>BEFORE(STATEMENT =&gt; ...)</code></td>
+</tr>
+<tr class="even">
+<td>Restore dropped table</td>
+<td><code>UNDROP TABLE table_name</code></td>
+</tr>
+<tr class="odd">
+<td>Clone old version</td>
+<td><code>CLONE ... AT (...)</code></td>
+</tr>
+<tr class="even">
+<td>Set retention</td>
+<td><code>ALTER TABLE ... SET DATA_RETENTION_TIME_IN_DAYS</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="conclusion">Conclusion</h1>
+<p>Snowflake Time Travel transforms recovery from a painful process into
+a simple SQL operation.</p>
+<p>If you work with production data pipelines, mastering Time Travel is
+essential.</p>
+<p>Because eventually, someone <em>will</em> run:</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">DELETE</span> <span class="kw">FROM</span> production_table;</span></code></pre></div>
+<p>And when that day comes, Time Travel might save your entire week.</p>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <link rel="stylesheet" href="../assets/medium.css">
+</head>
+<body>
+
+<main>
+<h1 id="snowflake-queries-that-waste-thousands-of-dollars">10 Snowflake
+Queries That Waste Thousands of Dollars</h1>
+<p>Snowflake makes it dangerously easy to scale compute.<br />
+That convenience is powerful — but it also means inefficient SQL can
+silently burn through thousands of dollars every month.</p>
+<p>Many teams focus only on correctness: - “Does the query work?” -
+“Does the dashboard load?” - “Did the pipeline finish?”</p>
+<p>But the real question should be:</p>
+<blockquote>
+<p>“How much warehouse compute did this query consume?”</p>
+</blockquote>
+<p>Here are 10 common Snowflake query patterns that quietly destroy
+performance and increase cloud costs — along with better
+alternatives.</p>
+<hr />
+<h1 id="select-on-large-tables">1. SELECT * on Large Tables</h1>
+<h2 id="the-problem">The Problem</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> SALES_TRANSACTIONS;</span></code></pre></div>
+<p>This looks harmless.</p>
+<p>But on wide enterprise tables with hundreds of columns and billions
+of rows, Snowflake scans unnecessary data, increasing: - I/O - Memory
+usage - Network transfer - Result cache size</p>
+<p>Even though Snowflake uses columnar storage, selecting unused columns
+still increases scan costs.</p>
+<hr />
+<h2 id="better-approach">Better Approach</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    customer_id,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    order_id,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    total_amount</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> SALES_TRANSACTIONS;</span></code></pre></div>
+<p>Only fetch what you need.</p>
+<hr />
+<h2 id="why-it-saves-money">Why It Saves Money</h2>
+<ul>
+<li>Fewer micro-partitions scanned</li>
+<li>Lower memory consumption</li>
+<li>Faster execution time</li>
+<li>Smaller result sets</li>
+</ul>
+<hr />
+<h1 id="missing-where-clauses-on-huge-tables">2. Missing WHERE Clauses
+on Huge Tables</h1>
+<h2 id="the-problem-1">The Problem</h2>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">COUNT</span>(<span class="op">*</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> EVENT_LOGS;</span></code></pre></div>
+<p>If your table contains years of data, this query scans
+everything.</p>
+<p>Teams often run queries like this repeatedly from dashboards,
+notebooks, or monitoring jobs.</p>
+<hr />
+<h2 id="better-approach-1">Better Approach</h2>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">COUNT</span>(<span class="op">*</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> EVENT_LOGS</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_date <span class="op">&gt;=</span> <span class="fu">CURRENT_DATE</span> <span class="op">-</span> <span class="dv">7</span>;</span></code></pre></div>
+<p>Always reduce the scanned dataset.</p>
+<hr />
+<h2 id="cost-impact">Cost Impact</h2>
+<p>Scanning 3 years of logs instead of 7 days can multiply compute costs
+by hundreds of times.</p>
+<hr />
+<h1 id="using-distinct-everywhere">3. Using DISTINCT Everywhere</h1>
+<h2 id="the-problem-2">The Problem</h2>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="kw">DISTINCT</span> customer_id</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS;</span></code></pre></div>
+<p><code>DISTINCT</code> forces expensive sorting or hashing
+operations.</p>
+<p>Many developers use it as a “quick fix” for duplicate rows instead of
+solving the root cause.</p>
+<hr />
+<h2 id="better-approach-2">Better Approach</h2>
+<p>Fix duplication at the join or source level.</p>
+<p>Example:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> customer_id</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> ORDERS</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">GROUP</span> <span class="kw">BY</span> customer_id;</span></code></pre></div>
+<p>Or better: - Deduplicate upstream - Use proper join conditions -
+Enforce business keys</p>
+<hr />
+<h2 id="why-its-expensive">Why It’s Expensive</h2>
+<p><code>DISTINCT</code> often causes: - Large memory spills - Remote
+disk usage - Longer warehouse runtime</p>
+<hr />
+<h1 id="exploding-cross-joins">4. Exploding CROSS JOINs</h1>
+<h2 id="the-problem-3">The Problem</h2>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> customers c</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CROSS</span> <span class="kw">JOIN</span> products p;</span></code></pre></div>
+<p>A CROSS JOIN multiplies every row from one table with every row from
+another.</p>
+<p>10 million customers × 100,000 products = disaster.</p>
+<hr />
+<h2 id="better-approach-3">Better Approach</h2>
+<p>Use explicit join conditions:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> customers c</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">JOIN</span> orders o</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">ON</span> c.customer_id <span class="op">=</span> o.customer_id;</span></code></pre></div>
+<hr />
+<h2 id="cost-impact-1">Cost Impact</h2>
+<p>Accidental Cartesian products are one of the fastest ways to: - Spike
+warehouse usage - Cause memory spills - Crash dashboards</p>
+<hr />
+<h1 id="repeated-cte-recalculation">5. Repeated CTE Recalculation</h1>
+<h2 id="the-problem-4">The Problem</h2>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> expensive_data <span class="kw">AS</span> (</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> huge_table</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">WHERE</span> event_date <span class="op">&gt;=</span> <span class="fu">CURRENT_DATE</span> <span class="op">-</span> <span class="dv">365</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">COUNT</span>(<span class="op">*</span>) <span class="kw">FROM</span> expensive_data;</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">AVG</span>(amount) <span class="kw">FROM</span> expensive_data;</span></code></pre></div>
+<p>Depending on optimization behavior, Snowflake may recompute expensive
+CTEs multiple times.</p>
+<hr />
+<h2 id="better-approach-4">Better Approach</h2>
+<p>Materialize intermediate results:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> TEMP <span class="kw">TABLE</span> expensive_data <span class="kw">AS</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> huge_table</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="kw">WHERE</span> event_date <span class="op">&gt;=</span> <span class="fu">CURRENT_DATE</span> <span class="op">-</span> <span class="dv">365</span>;</span></code></pre></div>
+<p>Then reuse the temp table.</p>
+<hr />
+<h2 id="why-it-saves-money-1">Why It Saves Money</h2>
+<ul>
+<li>Avoids repeated scans</li>
+<li>Reduces redundant compute</li>
+<li>Improves pipeline stability</li>
+</ul>
+<hr />
+<h1 id="inefficient-window-functions">6. Inefficient Window
+Functions</h1>
+<h2 id="the-problem-5">The Problem</h2>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>        <span class="kw">ORDER</span> <span class="kw">BY</span> transaction_time</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    ) <span class="kw">AS</span> rn</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> transactions;</span></code></pre></div>
+<p>Window functions are expensive on massive datasets.</p>
+<p>Especially when: - Partition keys are high cardinality - Ordering
+columns are huge - No filtering is applied beforehand</p>
+<hr />
+<h2 id="better-approach-5">Better Approach</h2>
+<p>Filter early:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">WITH</span> recent_transactions <span class="kw">AS</span> (</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">FROM</span> transactions</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">WHERE</span> transaction_date <span class="op">&gt;=</span> <span class="fu">CURRENT_DATE</span> <span class="op">-</span> <span class="dv">30</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">*</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        <span class="kw">PARTITION</span> <span class="kw">BY</span> customer_id</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        <span class="kw">ORDER</span> <span class="kw">BY</span> transaction_time</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    ) <span class="kw">AS</span> rn</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> recent_transactions;</span></code></pre></div>
+<hr />
+<h2 id="cost-impact-2">Cost Impact</h2>
+<p>Window functions can trigger: - Massive sorting operations - Local
+disk spills - Remote storage spills</p>
+<hr />
+<h1 id="order-by-without-limit">7. ORDER BY Without LIMIT</h1>
+<h2 id="the-problem-6">The Problem</h2>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> large_table</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> created_at <span class="kw">DESC</span>;</span></code></pre></div>
+<p>Sorting billions of rows just to inspect recent data wastes
+compute.</p>
+<hr />
+<h2 id="better-approach-6">Better Approach</h2>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> large_table</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> created_at <span class="kw">DESC</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="kw">LIMIT</span> <span class="dv">100</span>;</span></code></pre></div>
+<hr />
+<h2 id="why-it-saves-money-2">Why It Saves Money</h2>
+<p>Sorting is one of the most expensive operations in distributed
+systems.</p>
+<p>Adding <code>LIMIT</code> dramatically reduces workload.</p>
+<hr />
+<h1 id="querying-semi-structured-data-repeatedly">8. Querying
+Semi-Structured Data Repeatedly</h1>
+<h2 id="the-problem-7">The Problem</h2>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    payload<span class="ch">:user:id</span>:<span class="ch">:STRING</span>,</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    payload<span class="ch">:device:type</span>:<span class="ch">:STRING</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> raw_events;</span></code></pre></div>
+<p>Repeated JSON parsing is expensive at scale.</p>
+<hr />
+<h2 id="better-approach-7">Better Approach</h2>
+<p>Flatten and normalize frequently used fields into structured
+columns.</p>
+<p>Example:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">TABLE</span> curated_events <span class="kw">AS</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    payload<span class="ch">:user:id</span>:<span class="ch">:STRING</span> <span class="kw">AS</span> user_id,</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    payload<span class="ch">:device:type</span>:<span class="ch">:STRING</span> <span class="kw">AS</span> device_type</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> raw_events;</span></code></pre></div>
+<hr />
+<h2 id="why-it-saves-money-3">Why It Saves Money</h2>
+<p>Structured columns: - Compress better - Scan faster - Avoid repeated
+parsing overhead</p>
+<hr />
+<h1 id="running-tiny-queries-on-huge-warehouses">9. Running Tiny Queries
+on Huge Warehouses</h1>
+<h2 id="the-problem-8">The Problem</h2>
+<p>Using an XL warehouse for lightweight queries:</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="fu">CURRENT_TIMESTAMP</span>;</span></code></pre></div>
+<p>Warehouse size matters.</p>
+<p>Even trivial queries consume credits based on warehouse size.</p>
+<hr />
+<h2 id="better-approach-8">Better Approach</h2>
+<p>Use warehouse sizing strategically: - XS for BI - Medium for ELT -
+Large only for heavy transformations</p>
+<p>Enable: - Auto suspend - Auto resume</p>
+<hr />
+<h2 id="real-world-issue">Real-World Issue</h2>
+<p>Many organizations lose thousands monthly because warehouses stay
+running overnight.</p>
+<hr />
+<h1 id="ignoring-query-profile-and-spills">10. Ignoring Query Profile
+and Spills</h1>
+<h2 id="the-problem-9">The Problem</h2>
+<p>Teams rarely inspect Snowflake Query Profile.</p>
+<p>As a result, they miss: - Remote disk spills - Large scans - Bad
+joins - Inefficient repartitioning</p>
+<hr />
+<h2 id="better-approach-9">Better Approach</h2>
+<p>Regularly inspect: - Bytes scanned - Partitions scanned - Spill
+volume - Execution time - Join operations</p>
+<p>Use:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">SELECT</span> <span class="op">*</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="kw">FROM</span> <span class="kw">TABLE</span>(INFORMATION_SCHEMA.QUERY_HISTORY())</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="kw">ORDER</span> <span class="kw">BY</span> start_time <span class="kw">DESC</span>;</span></code></pre></div>
+<hr />
+<h2 id="why-it-saves-money-4">Why It Saves Money</h2>
+<p>The Query Profile often reveals: - Queries scanning terabytes
+unnecessarily - Warehouses oversized for workloads - Inefficient
+transformations</p>
+<hr />
+<h1 id="bonus-tips-that-save-serious-money">Bonus Tips That Save Serious
+Money</h1>
+<h2 id="enable-auto-suspend">Enable Auto Suspend</h2>
+<p>Recommended: - 60 seconds - 300 seconds max</p>
+<hr />
+<h2 id="use-clustering-carefully">Use Clustering Carefully</h2>
+<p>Bad clustering keys can increase maintenance costs.</p>
+<p>Cluster only: - Very large tables - Frequently filtered tables</p>
+<hr />
+<h2 id="use-result-cache">Use Result Cache</h2>
+<p>Snowflake automatically caches results.</p>
+<p>Avoid changing queries unnecessarily if dashboards repeat the same
+logic.</p>
+<hr />
+<h1 id="final-thoughts">Final Thoughts</h1>
+<p>In Snowflake, performance problems are usually cost problems.</p>
+<p>The most expensive query is often not: - the slowest one, - the most
+complex one, - or the biggest transformation.</p>
+<p>It’s the query that runs inefficiently thousands of times every
+day.</p>
+<p>Small SQL optimizations can save: - hours of runtime, - warehouse
+contention, - and thousands of dollars per month.</p>
+<p>The best Snowflake engineers don’t just write correct SQL.</p>
+<p>They write cost-efficient SQL.</p>
+<hr />
+<h1 id="suggested-tags-for-medium">Suggested Tags for Medium</h1>
+<ul>
+<li>Snowflake</li>
+<li>SQL</li>
+<li>Data Engineering</li>
+<li>Cloud Computing</li>
+<li>Big Data</li>
+<li>Analytics Engineering</li>
+</ul>
+</main>
+
+</body>
+</html>
