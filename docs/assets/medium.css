@@ -52,3 +52,30 @@ blockquote {
     padding-left: 20px;
     color: #555;
 }
+
+.button-container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 20px;
+    margin-right: 10px;
+
+    background-color: #1a8917;
+    color: #ffffff !important;
+
+    text-decoration: none;
+    border-radius: 6px;
+
+    font-size: 16px;
+    font-weight: 600;
+
+    transition: background-color 0.2s ease;
+}
+
+.btn:hover {
+    background-color: #146b12;
+    color: #ffffff;
+}
