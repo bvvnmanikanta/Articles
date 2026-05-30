@@ -470,3 +470,12 @@ The best Snowflake engineers don’t just write correct SQL.
 They write cost-efficient SQL.
 
 ---
+
+# Suggested Tags for Medium
+
+- Snowflake
+- SQL
+- Data Engineering
+- Cloud Computing
+- Big Data
+- Analytics Engineering
