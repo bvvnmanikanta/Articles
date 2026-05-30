@@ -1,0 +1,54 @@
+body {
+    font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+    font-size: 21px;
+    line-height: 1.65;
+    color: #292929;
+    background: #ffffff;
+}
+
+main {
+    max-width: 740px;
+    margin: 60px auto;
+    padding: 0 20px;
+}
+
+h1 {
+    font-size: 42px;
+    margin-bottom: 20px;
+    line-height: 1.2;
+}
+
+h2 {
+    margin-top: 48px;
+    margin-bottom: 12px;
+}
+
+h3 {
+    margin-top: 32px;
+}
+
+p {
+    margin-bottom: 1.5em;
+}
+
+pre {
+    overflow-x: auto;
+    padding: 16px;
+    border-radius: 6px;
+    background: #f6f8fa;
+}
+
+code {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 0.9em;
+}
+
+img {
+    max-width: 100%;
+}
+
+blockquote {
+    border-left: 4px solid #1a8917;
+    padding-left: 20px;
+    color: #555;
+}
