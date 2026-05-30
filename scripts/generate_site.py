@@ -17,7 +17,7 @@ html = """
 
 for article in articles:
 
-    title = article.stem.replace("-", " ").title()
+    title = article.stem.replace("_", " ").title()
 
     html += f"""
     <article>
